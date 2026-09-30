@@ -173,7 +173,7 @@ Navigate to the project folder:
 cd GeminiFunctionCalling
 
 Execute the below statement build and deploy the Cloud Function:
-gcloud functions deploy gemini-fn-calling --gen2 --region=us-central1 --runtime=java11 --source=. --entry-point=cloudcode.helloworld.HelloWorld --trigger-http
+gcloud functions deploy gemini-fn-calling --gen2 --region=us-central1 --runtime=java21 --source=. --entry-point=cloudcode.helloworld.HelloWorld --trigger-http
 
 The URL after deployment would be in the format as below :
 https://us-central1-YOUR_PROJECT_ID.cloudfunctions.net/gemini-fn-calling

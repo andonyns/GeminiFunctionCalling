@@ -73,23 +73,36 @@ public class HelloWorld implements HttpFunction {
 
      // Get the request body as a JSON object.
     JsonObject requestJson = new Gson().fromJson(request.getReader(), JsonObject.class);
-    JsonArray calls_array = requestJson.getAsJsonArray("calls");
-    JsonArray calls = (JsonArray) calls_array.get(0);
-    String latlngString = calls.get(0).toString().replace("\"", "");
+    String latlngString = extractLatLng(requestJson);
     // Pass the incoming request body to the method
     String promptText = "What's the address for the latlong value '" + latlngString + "'?"; //40.714224,-73.961452
     String rawResult = callApi(projectId, location, modelName, promptText);
     //writer.write(rawResult);
 
-    rawResult = rawResult.replace("\n","");
-    String trimmed = rawResult.trim();
-    List<String> resultList = Arrays.asList(trimmed);
+    String return_value = buildRepliesJson(rawResult);
+    writer.write(return_value);
+  }
+
+  /**
+   * Extracts the "latlng" argument from the BigQuery remote-function request payload:
+   * {"calls":[["<lat,lng>"]]}.
+   */
+  static String extractLatLng(JsonObject requestJson) {
+    JsonArray calls_array = requestJson.getAsJsonArray("calls");
+    JsonArray calls = (JsonArray) calls_array.get(0);
+    return calls.get(0).toString().replace("\"", "");
+  }
+
+  /**
+   * Wraps the model's raw text response into the BigQuery remote-function response envelope:
+   * {"replies":["<rawResult, newlines stripped and trimmed>"]}.
+   */
+  static String buildRepliesJson(String rawResult) {
+    String cleaned = rawResult.replace("\n", "").trim();
+    List<String> resultList = Arrays.asList(cleaned);
     Map<String, List<String>> stringMap = new LinkedHashMap<>();
     stringMap.put("replies", resultList);
-
-      // Serialization
-    String return_value = gson.toJson(stringMap);
-    writer.write(return_value);
+    return gson.toJson(stringMap);
   }
 
   public static String callApi(String projectId, String location,
@@ -118,11 +131,10 @@ public class HelloWorld implements HttpFunction {
           .build();
 
       // Invoke the Gemini model with the use of the  tool to generate the API parameters from the prompt input.
-      GenerativeModel model = GenerativeModel.newBuilder()
-          .setModelName(modelName)
-          .setVertexAi(vertexAI)
-          .setTools(Arrays.asList(tool))
-          .build();
+      // Note: the Vertex AI SDK dropped the GenerativeModel.newBuilder() factory in favor of this
+      // constructor + fluent with*() style (verified against the version pinned by libraries-bom).
+      GenerativeModel model = new GenerativeModel(modelName, vertexAI)
+          .withTools(Arrays.asList(tool));
       GenerateContentResponse response = model.generateContent(promptText);
       Content responseJSONCnt = response.getCandidates(0).getContent();
       Part functionResponse = responseJSONCnt.getParts(0);
@@ -203,11 +215,9 @@ public class HelloWorld implements HttpFunction {
             .build()
     );
 
-     GenerativeModel modelForFinalResponse = GenerativeModel.newBuilder()
-      .setModelName(modelName)
-      .setVertexAi(vertexAI)
-      .build(); 
-      GenerateContentResponse finalResponse = modelForFinalResponse.generateContent(promptString + ": " + address, safetySettings);
+     GenerativeModel modelForFinalResponse = new GenerativeModel(modelName, vertexAI)
+      .withSafetySettings(safetySettings);
+      GenerateContentResponse finalResponse = modelForFinalResponse.generateContent(promptString + ": " + address);
        System.out.println("promptString + content: " + promptString + ": " + address);
         // See what the model replies now
         System.out.println("Print response: ");
